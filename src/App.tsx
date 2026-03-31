@@ -102,12 +102,16 @@ export default function App() {
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
 
   useEffect(() => {
-    const loadedClasses = AttendanceStorage.getClasses();
-    setClasses(loadedClasses);
-    if (loadedClasses.length > 0) {
-      setSelectedClass(loadedClasses[0]);
-    }
-    setRecords(AttendanceStorage.getAll());
+    const loadData = async () => {
+      const loadedClasses = await AttendanceStorage.getClasses();
+      setClasses(loadedClasses);
+      if (loadedClasses.length > 0) {
+        setSelectedClass(loadedClasses[0]);
+      }
+      const loadedRecords = await AttendanceStorage.getAll();
+      setRecords(loadedRecords);
+    };
+    loadData();
   }, []);
 
   const todayRecords = useMemo(() => {
