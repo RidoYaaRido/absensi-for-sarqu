@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AttendanceRecord, ClassData } from '../types';
 
 const STORAGE_KEY = 'siswa_hadir_attendance_v1';
@@ -30,8 +31,8 @@ const DEFAULT_CLASSES: ClassData[] = [
 
 export const AttendanceStorage = {
   // Attendance Records
-  save: (record: AttendanceRecord) => {
-    const records = AttendanceStorage.getAll();
+  save: async (record: AttendanceRecord) => {
+    const records = await AttendanceStorage.getAll();
     const existingIndex = records.findIndex(r => 
       r.studentName === record.studentName && 
       r.className === record.className &&
@@ -43,11 +44,11 @@ export const AttendanceStorage = {
     } else {
       records.unshift(record); // Newest first
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(records));
   },
 
-  getAll: (): AttendanceRecord[] => {
-    const data = localStorage.getItem(STORAGE_KEY);
+  getAll: async (): Promise<AttendanceRecord[]> => {
+    const data = await AsyncStorage.getItem(STORAGE_KEY);
     if (!data) return [];
     try {
       return JSON.parse(data);
@@ -57,13 +58,13 @@ export const AttendanceStorage = {
     }
   },
 
-  clear: () => {
-    localStorage.removeItem(STORAGE_KEY);
+  clear: async () => {
+    await AsyncStorage.removeItem(STORAGE_KEY);
   },
 
   // Classes and Students
-  getClasses: (): ClassData[] => {
-    const data = localStorage.getItem(CLASSES_KEY);
+  getClasses: async (): Promise<ClassData[]> => {
+    const data = await AsyncStorage.getItem(CLASSES_KEY);
     if (!data) return DEFAULT_CLASSES;
     try {
       return JSON.parse(data);
@@ -73,7 +74,7 @@ export const AttendanceStorage = {
     }
   },
 
-  saveClasses: (classes: ClassData[]) => {
-    localStorage.setItem(CLASSES_KEY, JSON.stringify(classes));
+  saveClasses: async (classes: ClassData[]) => {
+    await AsyncStorage.setItem(CLASSES_KEY, JSON.stringify(classes));
   }
 };

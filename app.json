@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "SiswaHadir",
+    "slug": "siswahadir",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "https://picsum.photos/seed/attendance/192/192",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "https://picsum.photos/seed/attendance/512/512",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "https://picsum.photos/seed/attendance/192/192",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.siswahadir.app"
+    },
+    "web": {
+      "favicon": "https://picsum.photos/seed/attendance/32/32"
+    }
+  }
+}

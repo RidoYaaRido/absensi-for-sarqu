@@ -38,12 +38,29 @@ import { motion, AnimatePresence } from 'motion/react';
 import { utils, writeFile } from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { App as CapacitorApp } from '@capacitor/app';
 import { AttendanceRecord, AttendanceStatus, Student, ClassData } from './types';
 import { AttendanceStorage } from './lib/storage';
 import { cn } from './lib/utils';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'input' | 'history' | 'manage'>('input');
+  
+  useEffect(() => {
+    // Handle Android Back Button
+    const backListener = CapacitorApp.addListener('backButton', ({ canGoBack }) => {
+      if (!canGoBack) {
+        CapacitorApp.exitApp();
+      } else {
+        window.history.back();
+      }
+    });
+
+    return () => {
+      backListener.then(l => l.remove());
+    };
+  }, []);
+
   const [classes, setClasses] = useState<ClassData[]>([]);
   const [selectedClass, setSelectedClass] = useState<ClassData | null>(null);
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
@@ -638,6 +655,27 @@ export default function App() {
                 >
                   <RefreshCw className="w-5 h-5" />
                 </button>
+              </div>
+
+              {/* APK Build Info */}
+              <div className="bg-blue-600 p-6 rounded-[32px] text-white shadow-xl shadow-blue-200 space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                    <Download className="w-5 h-5" />
+                  </div>
+                  <h3 className="font-bold">Siap Jadi APK</h3>
+                </div>
+                <p className="text-sm text-blue-100 leading-relaxed">
+                  Aplikasi ini sudah dikonfigurasi dengan <b>Capacitor</b>. Anda bisa mengubahnya menjadi file APK untuk Android.
+                </p>
+                <div className="bg-black/10 p-4 rounded-2xl space-y-2">
+                  <p className="text-[10px] font-bold uppercase tracking-wider opacity-60">Langkah Build:</p>
+                  <ol className="text-xs space-y-1 list-decimal list-inside opacity-90">
+                    <li>Jalankan <code className="bg-white/10 px-1 rounded">npm run build</code></li>
+                    <li>Gunakan Android Studio untuk build APK</li>
+                    <li>Atau install sebagai <b>PWA</b> via browser</li>
+                  </ol>
+                </div>
               </div>
 
               {/* Add Class Form */}
