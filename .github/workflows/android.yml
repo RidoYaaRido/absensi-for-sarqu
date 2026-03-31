@@ -14,7 +14,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Install Dependencies
         run: npm install
@@ -33,7 +33,11 @@ jobs:
 
       - name: Initialize Capacitor Android
         run: |
-          npx cap add android
+          if [ ! -d "android" ]; then
+            npx cap add android
+          else
+            echo "Android folder already exists, skipping add..."
+          fi
           npx cap sync android
 
       - name: Build APK
