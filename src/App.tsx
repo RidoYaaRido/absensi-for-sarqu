@@ -32,7 +32,20 @@ import {
   Download,
   RefreshCw
 } from 'lucide-react';
-import { format, isSameDay, parseISO } from 'date-fns';
+import { 
+  format, 
+  isSameDay, 
+  parseISO, 
+  startOfMonth, 
+  endOfMonth, 
+  startOfWeek, 
+  endOfWeek, 
+  eachDayOfInterval, 
+  isSameMonth, 
+  addMonths, 
+  subMonths,
+  isToday
+} from 'date-fns';
 import { id as localeID } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'motion/react';
 import { utils, writeFile } from 'xlsx';
@@ -69,6 +82,7 @@ export default function App() {
   
   // History view state
   const [selectedHistoryDate, setSelectedHistoryDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
   const [expandedClass, setExpandedClass] = useState<string | null>(null);
 
   // Management state
@@ -116,15 +130,10 @@ export default function App() {
   }, [records]);
 
   const calendarDays = useMemo(() => {
-    const days = [];
-    const today = new Date();
-    for (let i = 0; i < 14; i++) {
-      const date = new Date();
-      date.setDate(today.getDate() - i);
-      days.push(date);
-    }
-    return days;
-  }, []);
+    const start = startOfWeek(startOfMonth(currentMonth), { weekStartsOn: 1 });
+    const end = endOfWeek(endOfMonth(currentMonth), { weekStartsOn: 1 });
+    return eachDayOfInterval({ start, end });
+  }, [currentMonth]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -483,46 +492,84 @@ export default function App() {
                     <h2 className="text-2xl font-bold text-gray-900">Riwayat</h2>
                     <p className="text-sm text-gray-500">Pilih tanggal untuk melihat data.</p>
                   </div>
-                  {records.length > 0 && (
-                    <button 
-                      onClick={clearHistory}
-                      className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-colors"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {records.length > 0 && (
+                      <button 
+                        onClick={clearHistory}
+                        className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-colors"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
-                {/* Calendar Strip */}
-                <div className="flex gap-3 overflow-x-auto pb-4 no-scrollbar -mx-2 px-2">
-                  {calendarDays.map((date) => {
-                    const dateKey = format(date, 'yyyy-MM-dd');
-                    const isSelected = selectedHistoryDate === dateKey;
-                    const hasData = !!groupedRecordsByDate[dateKey];
-
-                    return (
-                      <button
-                        key={dateKey}
-                        onClick={() => setSelectedHistoryDate(dateKey)}
-                        className={cn(
-                          "flex flex-col items-center min-w-[64px] p-3 rounded-[24px] border transition-all relative",
-                          isSelected 
-                            ? "bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-100" 
-                            : "bg-white border-gray-100 text-gray-500 hover:border-gray-200"
-                        )}
+                {/* Full Calendar View */}
+                <div className="bg-white rounded-[32px] border border-gray-100 shadow-sm p-4 space-y-4">
+                  <div className="flex items-center justify-between px-2">
+                    <h3 className="font-bold text-gray-800 capitalize">
+                      {format(currentMonth, 'MMMM yyyy', { locale: localeID })}
+                    </h3>
+                    <div className="flex items-center gap-1">
+                      <button 
+                        onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+                        className="p-2 hover:bg-gray-50 rounded-xl text-gray-400"
                       >
-                        <span className="text-[10px] font-bold uppercase tracking-wider mb-1">
-                          {format(date, 'EEE', { locale: localeID })}
-                        </span>
-                        <span className="text-lg font-black leading-none">
-                          {format(date, 'd')}
-                        </span>
-                        {hasData && !isSelected && (
-                          <div className="absolute bottom-2 w-1 h-1 bg-blue-400 rounded-full" />
-                        )}
+                        <ChevronRight className="w-5 h-5 rotate-180" />
                       </button>
-                    );
-                  })}
+                      <button 
+                        onClick={() => setCurrentMonth(new Date())}
+                        className="p-2 hover:bg-gray-50 rounded-xl text-blue-600 font-bold text-[10px] uppercase tracking-wider"
+                      >
+                        Hari Ini
+                      </button>
+                      <button 
+                        onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+                        className="p-2 hover:bg-gray-50 rounded-xl text-gray-400"
+                      >
+                        <ChevronRight className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-7 gap-1">
+                    {['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'].map(day => (
+                      <div key={day} className="text-center py-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                        {day}
+                      </div>
+                    ))}
+                    {calendarDays.map((date) => {
+                      const dateKey = format(date, 'yyyy-MM-dd');
+                      const isSelected = selectedHistoryDate === dateKey;
+                      const isCurrentMonth = isSameMonth(date, currentMonth);
+                      const hasData = !!groupedRecordsByDate[dateKey];
+                      const isTodayDate = isToday(date);
+
+                      return (
+                        <button
+                          key={dateKey}
+                          onClick={() => setSelectedHistoryDate(dateKey)}
+                          className={cn(
+                            "aspect-square flex flex-col items-center justify-center rounded-2xl transition-all relative text-sm font-bold",
+                            !isCurrentMonth && "opacity-20",
+                            isSelected 
+                              ? "bg-blue-600 text-white shadow-lg shadow-blue-200" 
+                              : isTodayDate 
+                                ? "bg-blue-50 text-blue-600" 
+                                : "hover:bg-gray-50 text-gray-700"
+                          )}
+                        >
+                          {format(date, 'd')}
+                          {hasData && (
+                            <div className={cn(
+                              "absolute bottom-1.5 w-1 h-1 rounded-full",
+                              isSelected ? "bg-white" : "bg-blue-500"
+                            )} />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 
@@ -655,27 +702,6 @@ export default function App() {
                 >
                   <RefreshCw className="w-5 h-5" />
                 </button>
-              </div>
-
-              {/* APK Build Info */}
-              <div className="bg-blue-600 p-6 rounded-[32px] text-white shadow-xl shadow-blue-200 space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-                    <Download className="w-5 h-5" />
-                  </div>
-                  <h3 className="font-bold">Siap Jadi APK</h3>
-                </div>
-                <p className="text-sm text-blue-100 leading-relaxed">
-                  Aplikasi ini sudah dikonfigurasi dengan <b>Capacitor</b>. Anda bisa mengubahnya menjadi file APK untuk Android.
-                </p>
-                <div className="bg-black/10 p-4 rounded-2xl space-y-2">
-                  <p className="text-[10px] font-bold uppercase tracking-wider opacity-60">Langkah Build:</p>
-                  <ol className="text-xs space-y-1 list-decimal list-inside opacity-90">
-                    <li>Jalankan <code className="bg-white/10 px-1 rounded">npm run build</code></li>
-                    <li>Gunakan Android Studio untuk build APK</li>
-                    <li>Atau install sebagai <b>PWA</b> via browser</li>
-                  </ol>
-                </div>
               </div>
 
               {/* Add Class Form */}
