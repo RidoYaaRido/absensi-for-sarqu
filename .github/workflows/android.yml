@@ -17,10 +17,11 @@ jobs:
           node-version: 22
 
       - name: Install Dependencies
-        run: npm install
+        run: npm install --frozen-lockfile || npm install
 
       - name: Build Web Project
-        run: npm run build
+        run: |
+          npm run build
 
       - name: Setup Java
         uses: actions/setup-java@v4
