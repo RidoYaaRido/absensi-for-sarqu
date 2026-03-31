@@ -1,0 +1,5 @@
+{
+  "name": "SiswaHadir - Aplikasi Absensi Siswa",
+  "description": "Aplikasi absensi siswa modern dengan fitur riwayat dan unggah bukti.",
+  "requestFramePermissions": ["camera"]
+}
