@@ -48,16 +48,19 @@ import {
 } from 'date-fns';
 import { id as localeID } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'motion/react';
-import { utils, writeFile } from 'xlsx';
+import { utils, writeFile, write } from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { App as CapacitorApp } from '@capacitor/app';
+import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Share } from '@capacitor/share';
+import { Capacitor } from '@capacitor/core';
 import { AttendanceRecord, AttendanceStatus, Student, ClassData } from './types';
 import { AttendanceStorage } from './lib/storage';
 import { cn } from './lib/utils';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'input' | 'history' | 'manage'>('input');
+  const [activeTab, setActiveTab] = useState<'input' | 'history' | 'manage' | 'recap'>('input');
   
   useEffect(() => {
     // Handle Android Back Button
@@ -302,7 +305,102 @@ export default function App() {
     }
   };
 
-  const exportToExcel = () => {
+  const exportRecapToExcel = async () => {
+    const recapData: any[] = [];
+    classes.forEach(c => {
+      c.students.forEach(s => {
+        const studentRecords = records.filter(r => r.studentName === s.name && r.className === c.name);
+        recapData.push({
+          'Kelas': c.name,
+          'Nama Siswa': s.name,
+          'Hadir': studentRecords.filter(r => r.status === 'Hadir').length,
+          'Sakit': studentRecords.filter(r => r.status === 'Sakit').length,
+          'Izin': studentRecords.filter(r => r.status === 'Izin').length,
+          'Alpa': studentRecords.filter(r => r.status === 'Alpa').length,
+          'Total': studentRecords.length
+        });
+      });
+    });
+
+    const ws = utils.json_to_sheet(recapData);
+    const wb = utils.book_new();
+    utils.book_append_sheet(wb, ws, 'Rekap Absensi');
+    
+    const fileName = `Rekap_Absensi_${format(new Date(), 'yyyyMMdd_HHmm')}.xlsx`;
+    
+    if (Capacitor.isNativePlatform()) {
+      const excelBase64 = write(wb, { type: 'base64', bookType: 'xlsx' });
+      try {
+        const result = await Filesystem.writeFile({
+          path: fileName,
+          data: excelBase64,
+          directory: Directory.Cache,
+        });
+        await Share.share({
+          title: 'Bagikan Rekap Excel',
+          url: result.uri,
+        });
+      } catch (error) {
+        console.error('Error exporting Recap Excel:', error);
+      }
+    } else {
+      writeFile(wb, fileName);
+    }
+  };
+
+  const exportRecapToPDF = async () => {
+    const doc = new jsPDF();
+    doc.text('Rekap Absensi Siswa (Per Siswa)', 14, 15);
+    doc.setFontSize(10);
+    doc.text(`Dicetak pada: ${format(new Date(), 'd MMMM yyyy HH:mm', { locale: localeID })}`, 14, 22);
+
+    const tableData: any[] = [];
+    classes.forEach(c => {
+      c.students.forEach(s => {
+        const studentRecords = records.filter(r => r.studentName === s.name && r.className === c.name);
+        tableData.push([
+          c.name,
+          s.name,
+          studentRecords.filter(r => r.status === 'Hadir').length,
+          studentRecords.filter(r => r.status === 'Sakit').length,
+          studentRecords.filter(r => r.status === 'Izin').length,
+          studentRecords.filter(r => r.status === 'Alpa').length,
+          studentRecords.length
+        ]);
+      });
+    });
+
+    autoTable(doc, {
+      head: [['Kelas', 'Nama Siswa', 'H', 'S', 'I', 'A', 'Total']],
+      body: tableData,
+      startY: 28,
+      theme: 'grid',
+      headStyles: { fillColor: [37, 99, 235] }
+    });
+
+    const fileName = `Rekap_Absensi_${format(new Date(), 'yyyyMMdd_HHmm')}.pdf`;
+
+    if (Capacitor.isNativePlatform()) {
+      const pdfBase64 = doc.output('datauristring').split(',')[1];
+      try {
+        const result = await Filesystem.writeFile({
+          path: fileName,
+          data: pdfBase64,
+          directory: Directory.Cache,
+        });
+        await Share.share({
+          title: 'Bagikan Rekap PDF',
+          url: result.uri,
+        });
+      } catch (error) {
+        console.error('Error exporting Recap PDF:', error);
+      }
+    } else {
+      doc.save(fileName);
+    }
+  };
+
+  const exportToExcel = async () => {
     const data = records.map(r => ({
       'Nama Siswa': r.studentName,
       'Kelas': r.className,
@@ -314,10 +412,30 @@ export default function App() {
     const ws = utils.json_to_sheet(data);
     const wb = utils.book_new();
     utils.book_append_sheet(wb, ws, 'Laporan Absensi');
-    writeFile(wb, `Laporan_Absensi_${format(new Date(), 'yyyyMMdd_HHmm')}.xlsx`);
+    
+    const fileName = `Laporan_Absensi_${format(new Date(), 'yyyyMMdd_HHmm')}.xlsx`;
+    
+    if (Capacitor.isNativePlatform()) {
+      const excelBase64 = write(wb, { type: 'base64', bookType: 'xlsx' });
+      try {
+        const result = await Filesystem.writeFile({
+          path: fileName,
+          data: excelBase64,
+          directory: Directory.Cache,
+        });
+        await Share.share({
+          title: 'Bagikan Laporan Excel',
+          url: result.uri,
+        });
+      } catch (error) {
+        console.error('Error exporting Excel:', error);
+      }
+    } else {
+      writeFile(wb, fileName);
+    }
   };
 
-  const exportToPDF = () => {
+  const exportToPDF = async () => {
     const doc = new jsPDF();
     doc.text('Laporan Absensi Siswa', 14, 15);
     doc.setFontSize(10);
@@ -339,7 +457,26 @@ export default function App() {
       headStyles: { fillColor: [37, 99, 235] }
     });
 
-    doc.save(`Laporan_Absensi_${format(new Date(), 'yyyyMMdd_HHmm')}.pdf`);
+    const fileName = `Laporan_Absensi_${format(new Date(), 'yyyyMMdd_HHmm')}.pdf`;
+
+    if (Capacitor.isNativePlatform()) {
+      const pdfBase64 = doc.output('datauristring').split(',')[1];
+      try {
+        const result = await Filesystem.writeFile({
+          path: fileName,
+          data: pdfBase64,
+          directory: Directory.Cache,
+        });
+        await Share.share({
+          title: 'Bagikan Laporan PDF',
+          url: result.uri,
+        });
+      } catch (error) {
+        console.error('Error exporting PDF:', error);
+      }
+    } else {
+      doc.save(fileName);
+    }
   };
 
   return (
@@ -364,7 +501,7 @@ export default function App() {
 
       <main className="max-w-md mx-auto pb-32">
         <AnimatePresence mode="wait">
-          {activeTab === 'input' ? (
+          {activeTab === 'input' && (
             <motion.div 
               key="input"
               initial={{ opacity: 0, y: 10 }}
@@ -482,7 +619,9 @@ export default function App() {
                 )}
               </div>
             </motion.div>
-          ) : activeTab === 'history' ? (
+          )}
+
+          {activeTab === 'history' && (
             <motion.div 
               key="history"
               initial={{ opacity: 0, y: 10 }}
@@ -686,7 +825,125 @@ export default function App() {
                 )}
               </div>
             </motion.div>
-          ) : (
+          )}
+
+          {activeTab === 'recap' && (
+            <motion.div
+              key="recap"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="p-6 space-y-6"
+            >
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <h2 className="text-2xl font-bold text-gray-900">Rekap Absensi</h2>
+                  <p className="text-sm text-gray-500">Total kehadiran per siswa.</p>
+                </div>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={exportRecapToExcel}
+                    className="p-2 bg-green-50 rounded-xl text-green-600 border border-green-100"
+                    title="Ekspor Rekap Excel"
+                  >
+                    <FileSpreadsheet className="w-5 h-5" />
+                  </button>
+                  <button 
+                    onClick={exportRecapToPDF}
+                    className="p-2 bg-red-50 rounded-xl text-red-600 border border-red-100"
+                    title="Ekspor Rekap PDF"
+                  >
+                    <FileText className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Class Filter for Recap */}
+              <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+                <button
+                  onClick={() => setSelectedClass(null)}
+                  className={cn(
+                    "px-5 py-2 rounded-full font-bold text-xs whitespace-nowrap transition-all border",
+                    selectedClass === null 
+                      ? "bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100" 
+                      : "bg-white text-gray-500 border-gray-100 hover:border-gray-200"
+                  )}
+                >
+                  Semua Kelas
+                </button>
+                {classes.map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => setSelectedClass(c)}
+                    className={cn(
+                      "px-5 py-2 rounded-full font-bold text-xs whitespace-nowrap transition-all border",
+                      selectedClass?.id === c.id 
+                        ? "bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100" 
+                        : "bg-white text-gray-500 border-gray-100 hover:border-gray-200"
+                    )}
+                  >
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+
+              {/* Student Recap List */}
+              <div className="space-y-4">
+                {(selectedClass ? [selectedClass] : classes).map((c) => (
+                  <div key={c.id} className="space-y-3">
+                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest px-1">
+                      Kelas {c.name}
+                    </h3>
+                    <div className="space-y-3">
+                      {c.students.map((s) => {
+                        const studentRecords = records.filter(r => r.studentName === s.name && r.className === c.name);
+                        const stats = {
+                          H: studentRecords.filter(r => r.status === 'Hadir').length,
+                          S: studentRecords.filter(r => r.status === 'Sakit').length,
+                          I: studentRecords.filter(r => r.status === 'Izin').length,
+                          A: studentRecords.filter(r => r.status === 'Alpa').length,
+                        };
+
+                        return (
+                          <div key={s.id} className="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-400">
+                                <User className="w-5 h-5" />
+                              </div>
+                              <div>
+                                <p className="font-bold text-gray-800 text-sm">{s.name}</p>
+                                <p className="text-[10px] text-gray-400 font-medium">Total: {studentRecords.length} Hari</p>
+                              </div>
+                            </div>
+                            <div className="flex gap-1.5">
+                              <div className="flex flex-col items-center min-w-[32px] p-1.5 bg-green-50 rounded-xl border border-green-100">
+                                <span className="text-[8px] font-bold text-green-600 uppercase">H</span>
+                                <span className="text-xs font-bold text-gray-700">{stats.H}</span>
+                              </div>
+                              <div className="flex flex-col items-center min-w-[32px] p-1.5 bg-orange-50 rounded-xl border border-orange-100">
+                                <span className="text-[8px] font-bold text-orange-600 uppercase">S</span>
+                                <span className="text-xs font-bold text-gray-700">{stats.S}</span>
+                              </div>
+                              <div className="flex flex-col items-center min-w-[32px] p-1.5 bg-blue-50 rounded-xl border border-blue-100">
+                                <span className="text-[8px] font-bold text-blue-600 uppercase">I</span>
+                                <span className="text-xs font-bold text-gray-700">{stats.I}</span>
+                              </div>
+                              <div className="flex flex-col items-center min-w-[32px] p-1.5 bg-red-50 rounded-xl border border-red-100">
+                                <span className="text-[8px] font-bold text-red-600 uppercase">A</span>
+                                <span className="text-xs font-bold text-gray-700">{stats.A}</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'manage' && (
             <motion.div 
               key="manage"
               initial={{ opacity: 0, y: 10 }}
@@ -864,6 +1121,16 @@ export default function App() {
         >
           <History className="w-4 h-4" />
           Riwayat
+        </button>
+        <button
+          onClick={() => setActiveTab('recap')}
+          className={cn(
+            "flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-2xl transition-all font-bold text-[10px] uppercase tracking-wider",
+            activeTab === 'recap' ? "bg-blue-600 text-white shadow-lg shadow-blue-200" : "text-gray-400 hover:text-gray-600"
+          )}
+        >
+          <FileSpreadsheet className="w-4 h-4" />
+          Rekap
         </button>
         <button
           onClick={() => setActiveTab('manage')}
